@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WooCommerce Custom Reports
  * Description: Custom WooCommerce admin reports, starting with a clickable customer order count by billing phone.
- * Version: 1.0.0
+ * Version: 1.1.3
  * Author: Elmates
  * Author URI: https://elmates.com
  * Requires Plugins: woocommerce
@@ -13,7 +13,7 @@
 defined( 'ABSPATH' ) || exit;
 
 final class WPCOC_Customer_Order_Count {
-	const OPTION_STATUSES = 'wpcoc_count_statuses';
+	const OPTION_STATUSES = 'wccr_report_statuses';
 	const CACHE_KEY       = 'wpcoc_phone_order_counts_v1';
 
 	/** @var array<string,int>|null */
@@ -22,6 +22,7 @@ final class WPCOC_Customer_Order_Count {
 	public static function init() {
 		add_action( 'before_woocommerce_init', array( __CLASS__, 'declare_hpos_compatibility' ) );
 		add_action( 'admin_notices', array( __CLASS__, 'woocommerce_notice' ) );
+		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
 
 		add_filter( 'manage_edit-shop_order_columns', array( __CLASS__, 'add_legacy_column' ), 20 );
 		add_action( 'manage_shop_order_posts_custom_column', array( __CLASS__, 'render_legacy_column' ), 20, 2 );
@@ -37,8 +38,7 @@ final class WPCOC_Customer_Order_Count {
 		add_action( 'woocommerce_before_trash_order', array( __CLASS__, 'invalidate_counts' ) );
 		add_action( 'woocommerce_before_delete_order', array( __CLASS__, 'invalidate_counts' ) );
 
-		add_action( 'admin_menu', array( __CLASS__, 'settings_page' ) );
-		add_action( 'admin_init', array( __CLASS__, 'register_settings' ) );
+		add_action( 'admin_menu', array( 'WCCR_Sales_Reports', 'menu' ) );
 	}
 
 	public static function declare_hpos_compatibility() {
@@ -122,26 +122,47 @@ final class WPCOC_Customer_Order_Count {
 		return ( 11 === strlen( $digits ) && 0 === strpos( $digits, '01' ) ) ? $digits : '';
 	}
 
-	private static function statuses() {
-		$default = array( 'wc-pending', 'wc-processing', 'wc-on-hold', 'wc-completed', 'wc-failed', 'wc-cancelled', 'wc-refunded' );
-		$statuses = get_option( self::OPTION_STATUSES, $default );
-		return is_array( $statuses ) ? array_values( array_intersect( $default, $statuses ) ) : $default;
+	/** The shared report policy: all registered WooCommerce statuses by default. */
+	public static function enabled_statuses() {
+		$all = function_exists( 'wc_get_order_statuses' ) ? array_keys( wc_get_order_statuses() ) : array();
+		$saved = get_option( self::OPTION_STATUSES, null );
+		return is_array( $saved ) ? array_values( array_intersect( $all, $saved ) ) : $all;
+	}
+
+	public static function register_settings() {
+		register_setting( 'wccr_report_settings', self::OPTION_STATUSES, array( 'sanitize_callback' => array( __CLASS__, 'sanitize_statuses' ) ) );
+	}
+
+	public static function sanitize_statuses( $statuses ) {
+		self::invalidate_counts();
+		$all = function_exists( 'wc_get_order_statuses' ) ? array_keys( wc_get_order_statuses() ) : array();
+		return array_values( array_intersect( $all, array_map( 'sanitize_key', (array) $statuses ) ) );
+	}
+
+	public static function report_settings_html() {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) { return; }
+		$all = function_exists( 'wc_get_order_statuses' ) ? wc_get_order_statuses() : array();
+		$enabled = self::enabled_statuses();
+		echo '<details style="margin:18px 0"><summary><strong>' . esc_html__( 'Report Settings', 'woocommerce-custom-reports' ) . '</strong></summary><form method="post" action="options.php" style="margin:12px 0">';
+		settings_fields( 'wccr_report_settings' );
+		echo '<p>' . esc_html__( 'Only enabled statuses are included across all Custom Report screens and Customer Orders counts.', 'woocommerce-custom-reports' ) . '</p>';
+		foreach ( $all as $status => $label ) { echo '<label style="display:inline-block;min-width:180px;margin:4px 12px 4px 0"><input type="checkbox" name="' . esc_attr( self::OPTION_STATUSES ) . '[]" value="' . esc_attr( $status ) . '" ' . checked( in_array( $status, $enabled, true ), true, false ) . '> ' . esc_html( $label ) . '</label>'; }
+		submit_button( __( 'Save Report Settings', 'woocommerce-custom-reports' ), 'secondary', 'submit', false );
+		echo '</form></details>';
 	}
 
 	private static function get_counts() {
 		if ( null !== self::$counts ) {
 			return self::$counts;
 		}
-		$key = self::CACHE_KEY . '_' . md5( implode( ',', self::statuses() ) . ( self::is_hpos_enabled() ? 'hpos' : 'legacy' ) );
+		$statuses = self::enabled_statuses();
+		if ( empty( $statuses ) ) { return self::$counts = array(); }
+		$key = self::CACHE_KEY . '_' . ( self::is_hpos_enabled() ? 'hpos' : 'legacy' );
 		$cached = get_transient( $key );
 		if ( is_array( $cached ) ) {
 			return self::$counts = $cached;
 		}
 		global $wpdb;
-		$statuses = self::statuses();
-		if ( empty( $statuses ) ) {
-			return self::$counts = array();
-		}
 		$placeholders = implode( ',', array_fill( 0, count( $statuses ), '%s' ) );
 		// The expression intentionally mirrors normalize_phone(): no stored customer data is changed.
 		if ( self::is_hpos_enabled() ) {
@@ -165,7 +186,7 @@ final class WPCOC_Customer_Order_Count {
 	public static function invalidate_counts() {
 		global $wpdb;
 		foreach ( array( true, false ) as $hpos ) {
-			delete_transient( self::CACHE_KEY . '_' . md5( implode( ',', self::statuses() ) . ( $hpos ? 'hpos' : 'legacy' ) ) );
+			delete_transient( self::CACHE_KEY . '_' . ( $hpos ? 'hpos' : 'legacy' ) );
 		}
 		self::$counts = null;
 	}
@@ -184,32 +205,8 @@ final class WPCOC_Customer_Order_Count {
 		return isset( $_GET['page'] ) && 'wc-orders' === $_GET['page'];
 	}
 
-	public static function settings_page() {
-		add_submenu_page( 'woocommerce', __( 'Custom Reports', 'woocommerce-custom-reports' ), __( 'Custom Reports', 'woocommerce-custom-reports' ), 'manage_woocommerce', 'wpcoc-settings', array( __CLASS__, 'settings_html' ) );
-	}
-
-	public static function register_settings() {
-		register_setting( 'wpcoc_settings', self::OPTION_STATUSES, array( 'sanitize_callback' => array( __CLASS__, 'sanitize_statuses' ) ) );
-	}
-
-	public static function sanitize_statuses( $value ) {
-		self::invalidate_counts();
-		$allowed = array( 'wc-pending', 'wc-processing', 'wc-on-hold', 'wc-completed', 'wc-failed', 'wc-cancelled', 'wc-refunded' );
-		return array_values( array_intersect( $allowed, array_map( 'sanitize_key', (array) $value ) ) );
-	}
-
-	public static function settings_html() {
-		if ( ! current_user_can( 'manage_woocommerce' ) ) { return; }
-		$selected = self::statuses();
-		$all = function_exists( 'wc_get_order_statuses' ) ? wc_get_order_statuses() : array();
-		?>
-		<div class="wrap"><h1><?php esc_html_e( 'WooCommerce Custom Reports', 'woocommerce-custom-reports' ); ?></h1>
-		<form action="options.php" method="post"><?php settings_fields( 'wpcoc_settings' ); ?>
-		<p><?php esc_html_e( 'Only selected genuine order statuses are counted and shown after clicking a count. Phone normalization strips spaces, punctuation and +; +880/880 mobile numbers become 01XXXXXXXXX. Other values are ignored.', 'woocommerce-custom-reports' ); ?></p>
-		<?php foreach ( $all as $status => $label ) : ?><label style="display:block;margin:6px 0"><input type="checkbox" name="<?php echo esc_attr( self::OPTION_STATUSES ); ?>[]" value="<?php echo esc_attr( $status ); ?>" <?php checked( in_array( $status, $selected, true ) ); ?>> <?php echo esc_html( $label ); ?></label><?php endforeach; ?>
-		<?php submit_button(); ?></form></div>
-		<?php
-	}
 }
 
 add_action( 'plugins_loaded', array( 'WPCOC_Customer_Order_Count', 'init' ) );
+
+require_once __DIR__ . '/includes/class-wccr-sales-reports.php';

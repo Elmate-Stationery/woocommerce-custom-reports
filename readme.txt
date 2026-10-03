@@ -3,11 +3,23 @@ Contributors: elmates
 Tags: woocommerce, reports, orders, customer, phone
 Requires at least: 6.2
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.3
 
 Custom WooCommerce admin reports. Version 1.0.0 provides a Customer Orders column in WooCommerce admin orders. The number is the current total for the billing phone. Clicking it opens WooCommerce's native order search using the `s` parameter and resets pagination to page one; it does not use a plugin-specific filter parameter.
 
 == Changelog ==
+
+= 1.1.3 =
+* Added shared Report Settings for dynamically available WooCommerce statuses, applied consistently to every report and customer order count.
+
+= 1.1.2 =
+* Customer order counts now include every placed order regardless of its current status; removed the count settings UI.
+
+= 1.1.1 =
+* Consolidated all reports and customer order count settings under WooCommerce > Custom Report.
+
+= 1.1.0 =
+* Added Customer Report sales overview, product sales, category sales, and sales-by-date reports.
 
 = 1.0.0 =
 * Initial release: customer order count by billing phone.
