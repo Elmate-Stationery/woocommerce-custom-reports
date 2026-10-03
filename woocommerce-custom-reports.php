@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WooCommerce Custom Reports
  * Description: Custom WooCommerce admin reports, starting with a clickable customer order count by billing phone.
- * Version: 1.1.3
+ * Version: 1.1.5
  * Author: Elmates
  * Author URI: https://elmates.com
  * Requires Plugins: woocommerce
@@ -143,12 +143,12 @@ final class WPCOC_Customer_Order_Count {
 		if ( ! current_user_can( 'manage_woocommerce' ) ) { return; }
 		$all = function_exists( 'wc_get_order_statuses' ) ? wc_get_order_statuses() : array();
 		$enabled = self::enabled_statuses();
-		echo '<details style="margin:18px 0"><summary><strong>' . esc_html__( 'Report Settings', 'woocommerce-custom-reports' ) . '</strong></summary><form method="post" action="options.php" style="margin:12px 0">';
+		echo '<div id="wccr-settings-modal" class="wccr-modal" role="dialog" aria-modal="true" aria-labelledby="wccr-settings-title" hidden><div class="wccr-modal__panel"><button type="button" class="wccr-modal__close" id="wccr-settings-close" aria-label="' . esc_attr__( 'Close report settings', 'woocommerce-custom-reports' ) . '">&times;</button><h2 id="wccr-settings-title">' . esc_html__( 'Report Settings', 'woocommerce-custom-reports' ) . '</h2><form method="post" action="options.php">';
 		settings_fields( 'wccr_report_settings' );
 		echo '<p>' . esc_html__( 'Only enabled statuses are included across all Custom Report screens and Customer Orders counts.', 'woocommerce-custom-reports' ) . '</p>';
 		foreach ( $all as $status => $label ) { echo '<label style="display:inline-block;min-width:180px;margin:4px 12px 4px 0"><input type="checkbox" name="' . esc_attr( self::OPTION_STATUSES ) . '[]" value="' . esc_attr( $status ) . '" ' . checked( in_array( $status, $enabled, true ), true, false ) . '> ' . esc_html( $label ) . '</label>'; }
 		submit_button( __( 'Save Report Settings', 'woocommerce-custom-reports' ), 'secondary', 'submit', false );
-		echo '</form></details>';
+		echo '</form></div></div>';
 	}
 
 	private static function get_counts() {
@@ -184,7 +184,6 @@ final class WPCOC_Customer_Order_Count {
 	}
 
 	public static function invalidate_counts() {
-		global $wpdb;
 		foreach ( array( true, false ) as $hpos ) {
 			delete_transient( self::CACHE_KEY . '_' . ( $hpos ? 'hpos' : 'legacy' ) );
 		}

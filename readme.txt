@@ -3,11 +3,19 @@ Contributors: elmates
 Tags: woocommerce, reports, orders, customer, phone
 Requires at least: 6.2
 Requires PHP: 7.4
-Stable tag: 1.1.3
+Stable tag: 1.1.5
 
-Custom WooCommerce admin reports. Version 1.0.0 provides a Customer Orders column in WooCommerce admin orders. The number is the current total for the billing phone. Clicking it opens WooCommerce's native order search using the `s` parameter and resets pagination to page one; it does not use a plugin-specific filter parameter.
+Custom WooCommerce admin reports: a Customer Orders column in WooCommerce admin orders, plus sales reports under WooCommerce > Custom Report. In the column, the number is the current total for the billing phone. Clicking it opens WooCommerce's native order search using the `s` parameter and resets pagination to page one; it does not use a plugin-specific filter parameter.
 
 == Changelog ==
+
+= 1.1.5 =
+* Moved Report Settings to a cross-button-only modal opened from the Custom Report tab bar.
+
+= 1.1.4 =
+* Fixed SQL error when sorting Products/Categories by an invalid column.
+* Custom date ranges are validated (invalid dates fall back to the last 30 days; reversed ranges are swapped).
+* Updated readme.
 
 = 1.1.3 =
 * Added shared Report Settings for dynamically available WooCommerce statuses, applied consistently to every report and customer order count.
@@ -32,4 +40,4 @@ The count link intentionally sends the order's original stored billing-phone val
 
 == Statuses ==
 
-By default all normal WooCommerce order statuses, including pending, failed, cancelled and refunded, are counted. Change them at WooCommerce > Customer Order Count. The same selection applies to the linked filtered list.
+Which order statuses are counted is controlled in one place: the Report Settings panel on WooCommerce > Custom Report. By default all registered WooCommerce statuses are enabled. The selection applies to every report tab and to the Customer Orders column. Trashed and draft/auto-draft orders are never counted.

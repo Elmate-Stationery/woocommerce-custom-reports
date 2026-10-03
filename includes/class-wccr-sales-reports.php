@@ -13,20 +13,31 @@ final class WCCR_Sales_Reports {
 		if ( ! in_array( $tab, array( 'overview', 'products', 'categories', 'dates' ), true ) ) { $tab = 'overview'; }
 		$range = self::range();
 		echo '<div class="wrap"><h1>' . esc_html__( 'Custom Report', 'woocommerce-custom-reports' ) . '</h1>';
-		self::tabs( $tab ); WPCOC_Customer_Order_Count::report_settings_html(); self::filters( $tab, $range );
+		self::tabs( $tab ); WPCOC_Customer_Order_Count::report_settings_html(); self::modal_assets(); self::filters( $tab, $range );
 		if ( 'overview' === $tab ) { self::overview( $range ); } elseif ( 'products' === $tab ) { self::products( $range ); } elseif ( 'categories' === $tab ) { self::categories( $range ); } else { self::dates( $range ); }
 		echo '</div>';
 	}
 
 	private static function tabs( $active ) {
 		$tabs = array( 'overview' => __( 'Overview', 'woocommerce-custom-reports' ), 'products' => __( 'Product Sales', 'woocommerce-custom-reports' ), 'categories' => __( 'Category Sales', 'woocommerce-custom-reports' ), 'dates' => __( 'Sales by Date', 'woocommerce-custom-reports' ) );
-		echo '<nav class="nav-tab-wrapper">'; foreach ( $tabs as $key => $label ) { echo '<a class="nav-tab ' . ( $key === $active ? 'nav-tab-active' : '' ) . '" href="' . esc_url( add_query_arg( array( 'page' => 'wccr-customer-report', 'tab' => $key ) ) ) . '">' . esc_html( $label ) . '</a>'; } echo '</nav>';
+		echo '<div class="wccr-tabs"><nav class="nav-tab-wrapper">'; foreach ( $tabs as $key => $label ) { echo '<a class="nav-tab ' . ( $key === $active ? 'nav-tab-active' : '' ) . '" href="' . esc_url( add_query_arg( array( 'page' => 'wccr-customer-report', 'tab' => $key ) ) ) . '">' . esc_html( $label ) . '</a>'; } echo '</nav><button type="button" id="wccr-settings-open" class="button-link wccr-settings-open">&#9656; ' . esc_html__( 'Report Settings', 'woocommerce-custom-reports' ) . '</button></div>';
+	}
+
+	private static function modal_assets() {
+		echo '<style>.wccr-tabs{display:flex;align-items:center;border-bottom:1px solid #c3c4c7}.wccr-tabs .nav-tab-wrapper{border:0;flex:1}.wccr-settings-open{color:#3c434a;text-decoration:none;padding:8px 14px;white-space:nowrap}.wccr-modal[hidden]{display:none}.wccr-modal{position:fixed;z-index:100000;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:8vh 20px}.wccr-modal__panel{position:relative;background:#fff;width:min(620px,100%);max-height:84vh;overflow:auto;padding:28px;box-shadow:0 4px 18px rgba(0,0,0,.3)}.wccr-modal__panel h2{margin-top:0}.wccr-modal__close{position:absolute;top:8px;right:10px;border:0;background:transparent;font-size:30px;line-height:1;cursor:pointer;color:#50575e}</style><script>document.addEventListener("DOMContentLoaded",function(){var modal=document.getElementById("wccr-settings-modal"),open=document.getElementById("wccr-settings-open"),close=document.getElementById("wccr-settings-close");if(!modal||!open||!close)return;open.addEventListener("click",function(){modal.hidden=false;close.focus();});close.addEventListener("click",function(){modal.hidden=true;open.focus();});});</script>';
 	}
 
 	private static function range() {
 		$key = isset( $_GET['range'] ) ? sanitize_key( wp_unslash( $_GET['range'] ) ) : 'last-30-days'; $today = current_time( 'Y-m-d' );
 		$map = array( 'today' => array( $today, $today ), 'yesterday' => array( gmdate( 'Y-m-d', strtotime( $today . ' -1 day' ) ), gmdate( 'Y-m-d', strtotime( $today . ' -1 day' ) ) ), 'last-7-days' => array( gmdate( 'Y-m-d', strtotime( $today . ' -6 days' ) ), $today ), 'last-30-days' => array( gmdate( 'Y-m-d', strtotime( $today . ' -29 days' ) ), $today ), 'this-month' => array( gmdate( 'Y-m-01', strtotime( $today ) ), $today ), 'last-month' => array( gmdate( 'Y-m-01', strtotime( $today . ' -1 month' ) ), gmdate( 'Y-m-t', strtotime( $today . ' -1 month' ) ) ) );
-		if ( 'custom' === $key && ! empty( $_GET['start'] ) && ! empty( $_GET['end'] ) ) { return array( 'key' => $key, 'start' => sanitize_text_field( wp_unslash( $_GET['start'] ) ), 'end' => sanitize_text_field( wp_unslash( $_GET['end'] ) ) ); }
+		if ( 'custom' === $key && ! empty( $_GET['start'] ) && ! empty( $_GET['end'] ) ) {
+			$start = sanitize_text_field( wp_unslash( $_GET['start'] ) ); $end = sanitize_text_field( wp_unslash( $_GET['end'] ) );
+			$valid = static function ( $d ) { $o = DateTime::createFromFormat( 'Y-m-d', $d ); return $o && $o->format( 'Y-m-d' ) === $d; };
+			if ( $valid( $start ) && $valid( $end ) ) {
+				if ( $start > $end ) { list( $start, $end ) = array( $end, $start ); }
+				return array( 'key' => $key, 'start' => $start, 'end' => $end );
+			}
+		}
 		$dates = isset( $map[ $key ] ) ? $map[ $key ] : $map['last-30-days']; return array( 'key' => $key, 'start' => $dates[0], 'end' => $dates[1] );
 	}
 
@@ -46,7 +57,7 @@ final class WCCR_Sales_Reports {
 	private static function products( $range ) { self::table_report($range,'products'); }
 	private static function categories( $range ) { self::table_report($range,'categories'); }
 	private static function dates( $range ) { self::table_report($range,'dates'); }
-	private static function table_report( $range, $type ) { global $wpdb; list($stats,$lookup)=self::tables(); $where=self::where($range); $q=isset($_GET['q'])?'%'.$wpdb->esc_like(sanitize_text_field(wp_unslash($_GET['q']))).'%':''; $sort=isset($_GET['orderby'])?sanitize_key(wp_unslash($_GET['orderby'])):('dates'===$type?'period':'qty'); $allowed=array('orders','qty','gross','net','period'); if(!in_array($sort,$allowed,true))$sort='qty'; $dir=(isset($_GET['order'])&&'asc'===strtolower($_GET['order']))?'ASC':'DESC'; $page=max(1,absint(isset($_GET['paged'])?$_GET['paged']:1)); $limit=20;$offset=($page-1)*$limit;
+	private static function table_report( $range, $type ) { global $wpdb; list($stats,$lookup)=self::tables(); $where=self::where($range); $q=isset($_GET['q'])?'%'.$wpdb->esc_like(sanitize_text_field(wp_unslash($_GET['q']))).'%':''; $sort=isset($_GET['orderby'])?sanitize_key(wp_unslash($_GET['orderby'])):('dates'===$type?'period':'qty'); $allowed=('dates'===$type)?array('orders','qty','gross','net','period'):array('orders','qty','gross','net'); if(!in_array($sort,$allowed,true))$sort=('dates'===$type)?'period':'qty'; $dir=(isset($_GET['order'])&&'asc'===strtolower($_GET['order']))?'ASC':'DESC'; $page=max(1,absint(isset($_GET['paged'])?$_GET['paged']:1)); $limit=20;$offset=($page-1)*$limit;
 		if('products'===$type){$extra=$q?$wpdb->prepare(' AND (p.post_title LIKE %s OR pm.meta_value LIKE %s)',$q,$q):'';$sql="SELECT opl.product_id id, MAX(p.post_title) label, MAX(pm.meta_value) sku, COUNT(DISTINCT os.order_id) orders, SUM(opl.product_qty) qty, SUM(opl.product_gross_revenue) gross, SUM(opl.product_net_revenue) net FROM $lookup opl JOIN $stats os ON os.order_id=opl.order_id LEFT JOIN {$wpdb->posts} p ON p.ID=opl.product_id LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id=opl.product_id AND pm.meta_key='_sku' WHERE $where $extra GROUP BY opl.product_id";$headers=array('Product','SKU','Orders','Quantity Sold','Gross Sales','Net Sales');}
 		elseif('categories'===$type){$extra=$q?$wpdb->prepare(' AND t.name LIKE %s',$q):'';$sql="SELECT t.term_id id, t.name label, COUNT(DISTINCT os.order_id) orders, SUM(opl.product_qty) qty, SUM(opl.product_gross_revenue) gross, SUM(opl.product_net_revenue) net FROM $lookup opl JOIN $stats os ON os.order_id=opl.order_id LEFT JOIN {$wpdb->posts} product_post ON product_post.ID=opl.product_id JOIN {$wpdb->term_relationships} tr ON tr.object_id=COALESCE(NULLIF(product_post.post_parent,0), opl.product_id) JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id=tr.term_taxonomy_id AND tt.taxonomy='product_cat' JOIN {$wpdb->terms} t ON t.term_id=tt.term_id WHERE $where $extra GROUP BY t.term_id";$headers=array('Category','Orders','Quantity Sold','Gross Sales','Net Sales');}
 		else{$view=isset($_GET['view'])?sanitize_key(wp_unslash($_GET['view'])):'day';$fmt='day'===$view?'%Y-%m-%d':('week'===$view?'%x-W%v':'%Y-%m');$sql="SELECT DATE_FORMAT(os.date_created, '$fmt') period, COUNT(DISTINCT os.order_id) orders, SUM(opl.product_qty) qty, SUM(opl.product_gross_revenue) gross, SUM(opl.product_net_revenue) net FROM $lookup opl JOIN $stats os ON os.order_id=opl.order_id WHERE $where GROUP BY period";$headers=array('Date','Orders','Quantity Sold','Gross Sales','Net Sales');}
