@@ -3,11 +3,20 @@ Contributors: elmates
 Tags: woocommerce, reports, orders, customer, phone
 Requires at least: 6.2
 Requires PHP: 7.4
-Stable tag: 1.1.5
+Stable tag: 1.1.8
 
 Custom WooCommerce admin reports: a Customer Orders column in WooCommerce admin orders, plus sales reports under WooCommerce > Custom Report. In the column, the number is the current total for the billing phone. Clicking it opens WooCommerce's native order search using the `s` parameter and resets pagination to page one; it does not use a plugin-specific filter parameter.
 
 == Changelog ==
+
+= 1.1.8 =
+* Fixed report Orders links showing all orders on HPOS stores: the ID filter now uses the `post__in` argument that WooCommerce's Orders table supports.
+
+= 1.1.7 =
+* Prevented legacy order filtering from running report lookups on unrelated HPOS admin queries.
+
+= 1.1.6 =
+* Made report Orders counts link to the matching native WooCommerce Orders table results.
 
 = 1.1.5 =
 * Moved Report Settings to a cross-button-only modal opened from the Custom Report tab bar.

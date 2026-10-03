@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WooCommerce Custom Reports
  * Description: Custom WooCommerce admin reports, starting with a clickable customer order count by billing phone.
- * Version: 1.1.5
+ * Version: 1.1.8
  * Author: Elmates
  * Author URI: https://elmates.com
  * Requires Plugins: woocommerce
@@ -209,3 +209,4 @@ final class WPCOC_Customer_Order_Count {
 add_action( 'plugins_loaded', array( 'WPCOC_Customer_Order_Count', 'init' ) );
 
 require_once __DIR__ . '/includes/class-wccr-sales-reports.php';
+WCCR_Sales_Reports::init();
